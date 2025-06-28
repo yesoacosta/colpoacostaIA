@@ -5,6 +5,7 @@ from PIL import Image
 from fpdf import FPDF
 import os
 import unicodedata
+import tempfile
 
 st.set_page_config(page_title="ColpoVision Estética Moderna", layout="wide")
 st.title("📋 ColpoVision – Informe Estético Profesional")
@@ -84,30 +85,27 @@ if uploaded_img:
             pdf.set_font("Arial", "B", 16)
             pdf.set_text_color(40, 40, 60)
             
+            # Lista para almacenar archivos temporales a limpiar
+            temp_files = []
+            
             # Manejo del logo
             logo_added = False
             if logo_img is not None:
                 try:
-                    # Convertir logo a BytesIO para FPDF
                     logo_img.seek(0)
                     logo_pil = Image.open(logo_img)
                     if logo_pil.mode in ("RGBA", "P"):
                         logo_pil = logo_pil.convert("RGB")
                     
-                    logo_buffer = BytesIO()
-                    logo_pil.save(logo_buffer, format='JPEG')
-                    logo_buffer.seek(0)
+                    # Crear archivo temporal con nombre único
+                    temp_logo_fd, temp_logo_path = tempfile.mkstemp(suffix='.jpg')
+                    temp_files.append(temp_logo_path)
                     
-                    # Guardar temporalmente para FPDF
-                    with open('temp_logo.jpg', 'wb') as f:
-                        f.write(logo_buffer.getvalue())
+                    with os.fdopen(temp_logo_fd, 'wb') as temp_file:
+                        logo_pil.save(temp_file, format='JPEG')
                     
-                    pdf.image('temp_logo.jpg', 10, 8, 40)
+                    pdf.image(temp_logo_path, 10, 8, 40)
                     logo_added = True
-                    
-                    # Limpiar archivo temporal
-                    if os.path.exists('temp_logo.jpg'):
-                        os.remove('temp_logo.jpg')
                         
                 except Exception as e:
                     st.warning(f"No se pudo cargar el logo: {str(e)}")
@@ -174,20 +172,15 @@ if uploaded_img:
                     if firma_pil.mode in ("RGBA", "P"):
                         firma_pil = firma_pil.convert("RGB")
                     
-                    firma_buffer = BytesIO()
-                    firma_pil.save(firma_buffer, format='JPEG')
-                    firma_buffer.seek(0)
+                    # Crear archivo temporal con nombre único
+                    temp_firma_fd, temp_firma_path = tempfile.mkstemp(suffix='.jpg')
+                    temp_files.append(temp_firma_path)
                     
-                    # Guardar temporalmente para FPDF
-                    with open('temp_firma.jpg', 'wb') as f:
-                        f.write(firma_buffer.getvalue())
+                    with os.fdopen(temp_firma_fd, 'wb') as temp_file:
+                        firma_pil.save(temp_file, format='JPEG')
                     
-                    pdf.image('temp_firma.jpg', x=10, w=40)
+                    pdf.image(temp_firma_path, x=10, w=40)
                     firma_added = True
-                    
-                    # Limpiar archivo temporal
-                    if os.path.exists('temp_firma.jpg'):
-                        os.remove('temp_firma.jpg')
                         
                 except Exception as e:
                     st.warning(f"No se pudo cargar la firma: {str(e)}")
@@ -209,39 +202,51 @@ if uploaded_img:
             # Manejo de la imagen del estudio
             if imagen:
                 try:
-                    # Convertir imagen a formato compatible
                     uploaded_img.seek(0)
                     img_pil = Image.open(uploaded_img)
                     if img_pil.mode in ("RGBA", "P"):
                         img_pil = img_pil.convert("RGB")
                     
-                    img_buffer = BytesIO()
-                    img_pil.save(img_buffer, format='JPEG')
-                    img_buffer.seek(0)
+                    # Crear archivo temporal con nombre único
+                    temp_img_fd, temp_img_path = tempfile.mkstemp(suffix='.jpg')
+                    temp_files.append(temp_img_path)
                     
-                    # Guardar temporalmente para FPDF
-                    with open('temp_study_img.jpg', 'wb') as f:
-                        f.write(img_buffer.getvalue())
+                    with os.fdopen(temp_img_fd, 'wb') as temp_file:
+                        img_pil.save(temp_file, format='JPEG')
                     
-                    pdf.image('temp_study_img.jpg', x=130, y=210, w=60)
+                    pdf.image(temp_img_path, x=130, y=210, w=60)
                     pdf.set_xy(130, 275)
                     pdf.set_font("Arial", "", 8)
                     pdf.cell(60, 5, "Imagen utilizada para el análisis automatizado por IA", 0, 1, 'C')
-                    
-                    # Limpiar archivo temporal
-                    if os.path.exists('temp_study_img.jpg'):
-                        os.remove('temp_study_img.jpg')
                         
                 except Exception as e:
                     st.warning(f"No se pudo incluir la imagen en el PDF: {str(e)}")
 
-            pdf_output = BytesIO()
-            pdf.output(pdf_output)
-            pdf_output.seek(0)
+            # CORRECCIÓN PRINCIPAL: Usar archivo temporal para el PDF final
+            temp_pdf_fd, temp_pdf_path = tempfile.mkstemp(suffix='.pdf')
+            temp_files.append(temp_pdf_path)
+            
+            # Cerrar el descriptor de archivo antes de usarlo con FPDF
+            os.close(temp_pdf_fd)
+            
+            # Generar el PDF en archivo temporal
+            pdf.output(temp_pdf_path, 'F')  # 'F' para archivo
+            
+            # Leer el archivo PDF generado como bytes
+            with open(temp_pdf_path, 'rb') as pdf_file:
+                pdf_bytes = pdf_file.read()
+            
+            # Limpiar archivos temporales
+            for temp_file in temp_files:
+                try:
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+                except:
+                    pass
             
             st.download_button(
                 "📥 Descargar informe PDF moderno", 
-                data=pdf_output.getvalue(), 
+                data=pdf_bytes, 
                 file_name="informe_colposcopico_moderno.pdf",
                 mime="application/pdf"
             )
@@ -250,6 +255,9 @@ if uploaded_img:
         except Exception as e:
             st.error(f"Error al generar el PDF: {str(e)}")
             # Limpiar archivos temporales en caso de error
-            for temp_file in ['temp_logo.jpg', 'temp_firma.jpg', 'temp_study_img.jpg']:
-                if os.path.exists(temp_file):
-                    os.remove(temp_file)
+            try:
+                for temp_file in temp_files:
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+            except:
+                pass
