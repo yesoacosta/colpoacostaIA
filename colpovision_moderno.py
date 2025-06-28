@@ -4,9 +4,40 @@ from io import BytesIO
 from PIL import Image
 from fpdf import FPDF
 import os
+import unicodedata
 
 st.set_page_config(page_title="ColpoVision Estética Moderna", layout="wide")
 st.title("📋 ColpoVision – Informe Estético Profesional")
+
+def limpiar_texto(texto):
+    """Convierte caracteres especiales a equivalentes ASCII para FPDF"""
+    if not texto:
+        return ""
+    # Reemplazar caracteres problemáticos comunes
+    replacements = {
+        '\u2013': '-',  # en dash
+        '\u2014': '-',  # em dash
+        '\u2018': "'",  # left single quotation mark
+        '\u2019': "'",  # right single quotation mark
+        '\u201C': '"',  # left double quotation mark
+        '\u201D': '"',  # right double quotation mark
+        '\u2026': '...',  # horizontal ellipsis
+        '\u00A0': ' ',  # non-breaking space
+    }
+    
+    for unicode_char, ascii_char in replacements.items():
+        texto = texto.replace(unicode_char, ascii_char)
+    
+    # Normalizar y quitar acentos si es necesario
+    try:
+        # Intentar codificar en latin-1 para verificar
+        texto.encode('latin-1')
+        return texto
+    except UnicodeEncodeError:
+        # Si falla, normalizar caracteres
+        texto = unicodedata.normalize('NFD', texto)
+        texto = ''.join(c for c in texto if unicodedata.category(c) != 'Mn')
+        return texto
 
 def diagnostico_IA_basico(img):
     img = img.convert("L").resize((64, 64))
@@ -102,35 +133,35 @@ if uploaded_img:
             pdf.ln(10)
             pdf.set_text_color(0)
             pdf.multi_cell(0, 8, f"Fecha del estudio: {fecha.strftime('%d/%m/%Y')}")
-            pdf.multi_cell(0, 8, f"Paciente: {nombre} | Edad: {edad}")
-            pdf.multi_cell(0, 8, f"Motivo de consulta: {motivo}")
+            pdf.multi_cell(0, 8, limpiar_texto(f"Paciente: {nombre} | Edad: {edad}"))
+            pdf.multi_cell(0, 8, limpiar_texto(f"Motivo de consulta: {motivo}"))
 
             pdf.ln(5)
             pdf.set_font("Arial", "B", 12)
-            pdf.cell(0, 8, "Técnica y Métodos Utilizados", ln=True)
+            pdf.cell(0, 8, "Tecnica y Metodos Utilizados", ln=True)
             pdf.set_font("Arial", "", 12)
-            pdf.multi_cell(0, 8, tecnica)
+            pdf.multi_cell(0, 8, limpiar_texto(tecnica))
             pdf.ln(2)
             pdf.set_font("Arial", "B", 12)
-            pdf.cell(0, 8, "Hallazgos Macroscópicos", ln=True)
+            pdf.cell(0, 8, "Hallazgos Macroscopicos", ln=True)
             pdf.set_font("Arial", "", 12)
-            pdf.multi_cell(0, 8, macro)
+            pdf.multi_cell(0, 8, limpiar_texto(macro))
             pdf.set_font("Arial", "B", 12)
-            pdf.cell(0, 8, "Hallazgos con Ácido Acético y Lugol", ln=True)
+            pdf.cell(0, 8, "Hallazgos con Acido Acetico y Lugol", ln=True)
             pdf.set_font("Arial", "", 12)
-            pdf.multi_cell(0, 8, reaccion)
+            pdf.multi_cell(0, 8, limpiar_texto(reaccion))
             pdf.set_font("Arial", "B", 12)
-            pdf.cell(0, 8, "Zona de Transformación", ln=True)
+            pdf.cell(0, 8, "Zona de Transformacion", ln=True)
             pdf.set_font("Arial", "", 12)
-            pdf.multi_cell(0, 8, zona)
+            pdf.multi_cell(0, 8, limpiar_texto(zona))
             pdf.set_font("Arial", "B", 12)
-            pdf.cell(0, 8, "Impresión Diagnóstica", ln=True)
+            pdf.cell(0, 8, "Impresion Diagnostica", ln=True)
             pdf.set_font("Arial", "", 12)
-            pdf.multi_cell(0, 8, impresion)
+            pdf.multi_cell(0, 8, limpiar_texto(impresion))
             pdf.set_font("Arial", "B", 12)
             pdf.cell(0, 8, "Recomendaciones", ln=True)
             pdf.set_font("Arial", "", 12)
-            pdf.multi_cell(0, 8, recomendacion)
+            pdf.multi_cell(0, 8, limpiar_texto(recomendacion))
 
             pdf.ln(10)
             
@@ -172,8 +203,8 @@ if uploaded_img:
             pdf.set_font("Arial", "B", 12)
             pdf.cell(0, 10, "Dr. Yesid Acosta Peinado", ln=True)
             pdf.set_font("Arial", "", 11)
-            pdf.cell(0, 7, "Ginecólogo y Obstetra", ln=True)
-            pdf.cell(0, 7, "M.P. 33210 – M.E. 16665", ln=True)
+            pdf.cell(0, 7, "Ginecologo y Obstetra", ln=True)
+            pdf.cell(0, 7, "M.P. 33210 - M.E. 16665", ln=True)
 
             # Manejo de la imagen del estudio
             if imagen:
